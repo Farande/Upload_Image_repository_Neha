@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>S3 Image Upload</title>
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --bg-2: #1e293b;
+            --card: rgba(15, 23, 42, 0.72);
+            --card-border: rgba(148, 163, 184, 0.25);
+            --primary: #8b5cf6;
+            --primary-2: #22d3ee;
+            --text: #e2e8f0;
+            --muted: #cbd5e1;
+            --success: #34d399;
+            --danger: #f87171;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: Arial, Helvetica, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(34, 211, 238, 0.2), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.22), transparent 30%),
+                linear-gradient(135deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+        }
+
+        .page-shell {
+            width: min(90vw, 560px);
+            position: relative;
+        }
+
+        .upload-card {
+            position: relative;
+            padding: 2rem;
+            border-radius: 24px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 30px 80px rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(16px);
+            overflow: hidden;
+        }
+
+        .upload-card::before {
+            content: "";
+            position: absolute;
+            inset: -30% 25% auto auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent 68%);
+            filter: blur(10px);
+        }
+
+        .header {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 1.25rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+            background: rgba(34, 211, 238, 0.1);
+            border: 1px solid rgba(34, 211, 238, 0.25);
+            color: #a5f3fc;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.85rem;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: clamp(1.75rem, 2vw, 2.2rem);
+            letter-spacing: -0.03em;
+        }
+
+        .dropzone {
+            position: relative;
+            display: block;
+            width: 100%;
+            min-height: 260px;
+            border: 1.5px dashed rgba(148, 163, 184, 0.5);
+            border-radius: 22px;
+            background: rgba(15, 23, 42, 0.6);
+            cursor: pointer;
+            transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .dropzone:hover,
+        .dropzone.dragover {
+            transform: translateY(-2px);
+            border-color: rgba(34, 211, 238, 0.75);
+            box-shadow: 0 14px 35px rgba(34, 211, 238, 0.12);
+        }
+
+        .dropzone::before {
+            content: "";
+            position: absolute;
+            inset: -15%;
+            background: radial-gradient(circle at center, rgba(139, 92, 246, 0.28), rgba(34, 211, 238, 0.12), transparent 62%);
+            filter: blur(22px);
+            animation: pulse 7s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.15); opacity: 1; }
+        }
+
+        input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 3;
+        }
+
+        .drop-content {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            place-items: center;
+            gap: 0.8rem;
+            min-height: 260px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .upload-icon {
+            width: 72px;
+            height: 72px;
+            display: grid;
+            place-items: center;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(34, 211, 238, 0.2));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 2rem;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .drop-content p {
+            margin: 0;
+            font-size: 1.08rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .drop-content small {
+            color: var(--muted);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+        }
+
+        #preview {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+            z-index: 1;
+        }
+
+        .actions {
+            position: relative;
+            z-index: 1;
+            margin-top: 1.25rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        button {
+            border: none;
+            border-radius: 14px;
+            padding: 0.95rem 1.4rem;
+            min-width: 170px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: white;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            box-shadow: 0 14px 32px rgba(34, 211, 238, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 32px rgba(139, 92, 246, 0.24);
+        }
+
+        .result {
+            position: relative;
+            z-index: 1;
+            margin: 1.1rem 0 0;
+            min-height: 24px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 0.98rem;
+            word-break: break-word;
+        }
+
+        .result.success { color: var(--success); }
+        .result.error { color: var(--danger); }
+        .result.loading { color: #a5f3fc; }
+
+        @media (max-width: 480px) {
+            .upload-card { padding: 1.25rem; border-radius: 20px; }
+            .dropzone, .drop-content { min-height: 220px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-shell">
+        <div class="upload-card">
+            <div class="header">
+                <span class="badge">Cloud Sync</span>
+                <h2>Upload Image to S3</h2>
+            </div>
+
+            <label class="dropzone" for="imageFile">
+                <input type="file" id="imageFile" accept="image/*" />
+                <img id="preview" alt="Selected preview" />
+                <div class="drop-content" id="dropContent">
+                    <div class="upload-icon">⬆</div>
+                    <p>Drag &amp; drop or click to choose</p>
+                    <small>PNG, JPG, WEBP</small>
+                </div>
+            </label>
+
+            <div class="actions">
+                <button type="button" onclick="uploadImage()">Upload Image</button>
+            </div>
+
+            <p id="result" class="result">Select an image to begin.</p>
+        </div>
+    </div>
+
+<script>
+    const FUNCTION_URL = "https://uu2whhvtof5zr4uhd3gcachwly0vthpp.lambda-url.ap-south-1.on.aws/";
+    const fileInput = document.getElementById("imageFile");
+    const result = document.getElementById("result");
+    const preview = document.getElementById("preview");
+    const dropzone = document.querySelector(".dropzone");
+
+    function updateResult(message, type = "") {
+        result.innerText = message;
+        result.className = "result";
+        if (type) {
+            result.classList.add(type);
+        }
+    }
+
+    function previewSelectedImage(file) {
+        if (!file || !file.type.startsWith("image/")) {
+            return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        preview.style.display = "block";
+        document.getElementById("dropContent").style.opacity = "0.05";
+    }
+
+    fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            updateResult("Please select a valid image file.", "error");
+            return;
+        }
+
+        previewSelectedImage(file);
+        updateResult("Image ready for upload.");
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.add("dragover");
+        });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.remove("dragover");
+        });
+    });
+
+    dropzone.addEventListener("drop", (event) => {
+        const file = event.dataTransfer.files[0];
+        if (!file) return;
+
+        fileInput.files = event.dataTransfer.files;
+        previewSelectedImage(file);
+        updateResult("Image ready for upload.");
+    });
+
+    async function uploadImage() {
+        if (!fileInput.files.length) {
+            updateResult("Please select an image.", "error");
+            return;
+        }
+
+        const file = fileInput.files[0];
+
+        try {
+            updateResult("Uploading...", "loading");
+
+            const arrayBuffer = await file.arrayBuffer();
+            const base64 = arrayBufferToBase64(arrayBuffer);
+
+            const response = await fetch(FUNCTION_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": file.type || "image/jpeg"
+                },
+                body: base64
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.message);
+            }
+
+            updateResult("Uploaded successfully: " + data.key, "success");
+            console.log(data);
+        } catch (error) {
+            console.error(error);
+            updateResult("Upload failed: " + error.message, "error");
+        }
+    }
+
+    function arrayBufferToBase64(buffer) {
+        let binary = "";
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(
+                ...bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+            );
+        }
+
+        return btoa(binary);
+    }
+</script>
+
+</body>
+</html>
