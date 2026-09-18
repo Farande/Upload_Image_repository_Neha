@@ -1,0 +1,33 @@
+version: 0.2
+
+phases:
+
+  install:
+    commands:
+      - echo "================================="
+      - echo "CarbonWise CI/CD Build Started"
+      - echo "================================="
+      - python3 --version
+
+  pre_build:
+    commands:
+      - echo "Checking Lambda Python code..."
+      - python3 -m py_compile lambda/lambda_function.py
+
+  build:
+    commands:
+      - echo "Python syntax check successful"
+      - echo "Creating Lambda deployment package..."
+      - cd lambda
+      - zip ../lambda.zip lambda_function.py
+      - cd ..
+
+  post_build:
+    commands:
+      - echo "================================="
+      - echo "Build completed successfully"
+      - echo "================================="
+
+artifacts:
+  files:
+    - lambda.zip
